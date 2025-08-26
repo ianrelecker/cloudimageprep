@@ -1,0 +1,12 @@
+- name: Ensure Azure Linux Agent is installed
+  apt:
+    name: walinuxagent
+    state: present
+    update_cache: yes
+
+- name: Enable and start Azure Linux Agent
+  systemd:
+    name: walinuxagent
+    enabled: true
+    state: started
+

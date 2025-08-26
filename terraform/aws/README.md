@@ -1,4 +1,4 @@
-# Terraform: Launch EC2 from Published AMI
+# Terraform (AWS): Launch EC2 from Published AMI
 
 This Terraform config launches an EC2 instance using a CloudPrep AMI.
 
@@ -21,11 +21,11 @@ aws ssm put-parameter \
   --value ami-xxxxxxxxxxxxxxxxx
 ```
 
-## Usage
+## Usage (AWS)
 
 Option A — SSM Parameter
 ```
-cd terraform
+cd terraform/aws
 terraform init
 terraform apply \
   -var aws_region=us-west-2 \
@@ -34,7 +34,7 @@ terraform apply \
 
 Option B — Direct AMI ID
 ```
-cd terraform
+cd terraform/aws
 terraform init
 terraform apply \
   -var aws_region=us-west-2 \

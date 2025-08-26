@@ -3,3 +3,6 @@
   roles:
     - role: base
     - role: aws
+      when: cloud_provider | default('aws') == 'aws'
+    - role: azure
+      when: cloud_provider | default('aws') == 'azure'

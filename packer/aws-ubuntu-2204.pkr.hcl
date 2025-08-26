@@ -44,7 +44,7 @@ build {
     user          = "ubuntu"
     extra_arguments = [
       "--extra-vars",
-      "ssh_github_user=${var.ssh_github_user}",
+      "ssh_github_user=${var.ssh_github_user} cloud_provider=aws target_ssh_user=ubuntu",
     ]
   }
 }

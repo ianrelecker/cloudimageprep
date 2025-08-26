@@ -73,3 +73,28 @@ locals {
     Release     = var.ubuntu_release,
   }, var.build_tags)
 }
+
+// Azure-specific variables
+variable "azure_location" {
+  type        = string
+  description = "Azure region to build in"
+  default     = "eastus2"
+}
+
+variable "azure_image_resource_group" {
+  type        = string
+  description = "Resource group where the managed image will be stored"
+  default     = "cloudprep-images"
+}
+
+variable "azure_vm_size" {
+  type        = string
+  description = "Temporary builder VM size"
+  default     = "Standard_B2s"
+}
+
+variable "azure_image_name_prefix" {
+  type        = string
+  description = "Prefix for Azure managed image names"
+  default     = "cloudprep"
+}

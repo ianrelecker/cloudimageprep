@@ -45,7 +45,7 @@
     state: present
     update_cache: yes
 
-- name: Authorize GitHub SSH keys for ubuntu user
+- name: Authorize GitHub SSH keys for target user
   block:
     - name: Fetch GitHub SSH keys for user on remote
       uri:
@@ -57,9 +57,9 @@
       delay: 2
       until: github_keys is succeeded
 
-    - name: Authorize fetched GitHub SSH keys for ubuntu user
+    - name: Authorize fetched GitHub SSH keys for target user
       authorized_key:
-        user: ubuntu
+        user: "{{ target_ssh_user | default('ubuntu') }}"
         state: present
         manage_dir: yes
         key: "{{ item }}"

@@ -8,3 +8,9 @@ ami_encrypted      = true
 instance_type      = "t3.small"
 ssh_github_user    = "ianrelecker"
 image_name_prefix  = "cloudprep"
+
+# Azure defaults
+azure_location              = "eastus2"
+azure_image_resource_group  = "cloudprep-images"
+azure_vm_size               = "Standard_B2s"
+azure_image_name_prefix     = "cloudprep"
