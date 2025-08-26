@@ -1,0 +1,56 @@
+# General OS/editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.log
+.idea/
+.vscode/
+
+# Python / virtual envs
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+pip-log.txt
+
+# Ansible
+*.retry
+.ansible/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+terraform.tfvars
+terraform.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+# Keep the lock file for reproducible provider versions
+!.terraform.lock.hcl
+
+# Explicitly ignore local Terraform state in repo subfolders
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+
+# Terraform plans (optional)
+*.tfplan
+*.plan
+
+# Packer
+packer/build.log
+packer/logs/
+packer/output-*/
+# Keep Packer plugin lockfile for reproducibility
+!packer/packer.lock.hcl
+
+# Misc cache folders that can appear
+.terragrunt-cache/
+.packer.d/
+packer/.packer.d/

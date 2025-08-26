@@ -1,0 +1,86 @@
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Upgrade packages to latest security releases
+  apt:
+    upgrade: safe
+    autoremove: yes
+
+- name: Ensure apt-add-repository is available
+  apt:
+    name: software-properties-common
+    state: present
+
+- name: Check if 'universe' repo is enabled
+  shell: "grep -R '^[^#].*universe' /etc/apt/sources.list /etc/apt/sources.list.d/*.list >/dev/null 2>&1"
+  register: universe_enabled
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['distribution'] == 'Ubuntu'
+
+- name: Enable Ubuntu 'universe' repository
+  command: add-apt-repository -y universe
+  register: universe_repo
+  when:
+    - ansible_facts['distribution'] == 'Ubuntu'
+    - universe_enabled is defined and universe_enabled.rc != 0
+
+- name: Refresh apt cache if repositories changed
+  apt:
+    update_cache: yes
+  when: universe_repo is defined and universe_repo is changed
+
+- name: Ensure common packages are installed
+  apt:
+    name:
+      - curl
+      - unzip
+      - jq
+      - python3
+      - python3-apt
+      - ca-certificates
+      - git
+    state: present
+    update_cache: yes
+
+- name: Authorize GitHub SSH keys for ubuntu user
+  block:
+    - name: Fetch GitHub SSH keys for user on remote
+      uri:
+        url: "https://github.com/{{ ssh_github_user }}.keys"
+        return_content: yes
+        status_code: [200, 404]
+      register: github_keys
+      retries: 3
+      delay: 2
+      until: github_keys is succeeded
+
+    - name: Authorize fetched GitHub SSH keys for ubuntu user
+      authorized_key:
+        user: ubuntu
+        state: present
+        manage_dir: yes
+        key: "{{ item }}"
+      loop: "{{ (github_keys.content | default('') | trim | split('\n') | reject('equalto','') | list) }}"
+      when: github_keys.status == 200 and (github_keys.content | default('') | trim) != ''
+
+- name: Disable SSH root login
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: 'PermitRootLogin no'
+    create: no
+
+- name: Disable SSH password authentication
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication no'
+    create: no
+
+- name: Restart SSH service
+  service:
+    name: ssh
+    state: restarted

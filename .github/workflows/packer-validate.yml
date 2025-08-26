@@ -1,0 +1,44 @@
+name: Packer Validate
+
+on:
+  pull_request:
+    paths:
+      - 'packer/**'
+      - 'ansible/**'
+      - '.github/workflows/packer-validate.yml'
+
+jobs:
+  validate:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@v3
+        with:
+          version: '1.9.5'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible (for validate)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --user ansible-core
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Tool versions
+        run: |
+          packer version
+          ansible-playbook --version
+
+      - name: Init Packer plugins
+        working-directory: packer
+        run: packer init .
+
+      - name: Validate Packer templates
+        working-directory: packer
+        run: packer validate .

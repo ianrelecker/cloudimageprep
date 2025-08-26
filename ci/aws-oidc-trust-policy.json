@@ -1,0 +1,30 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GitHubOIDCRepoEnvAndBranches",
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::327348774151:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": [
+            "repo:ianrelecker/cloudprep:environment:packer-build",
+            "repo:ianrelecker/cloudprep:ref:refs/heads/*",
+            "repo:ianrelecker/cloudprep:ref:refs/pull/*",
+            "repo:ianrelecker/cloudprep:pull_request"
+          ],
+          "token.actions.githubusercontent.com:job_workflow_ref": [
+            "ianrelecker/cloudprep/.github/workflows/packer-build-aws.yml@*",
+            "ianrelecker/cloudprep/.github/workflows/packer-validate.yml@*"
+          ]
+        }
+      }
+    }
+  ]
+}

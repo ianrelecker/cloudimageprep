@@ -1,0 +1,29 @@
+- name: Ensure snapd is installed (for SSM Agent)
+  apt:
+    name: snapd
+    state: present
+
+- name: Install Amazon SSM Agent via snap
+  shell: |
+    set -euo pipefail
+    snap list amazon-ssm-agent >/dev/null 2>&1 || snap install amazon-ssm-agent --classic
+  args:
+    executable: /bin/bash
+
+- name: Enable and start Amazon SSM Agent
+  systemd:
+    name: snap.amazon-ssm-agent.amazon-ssm-agent.service
+    enabled: true
+    state: started
+
+# Optional: CloudWatch Agent install (commented out by default)
+# - name: Install Amazon CloudWatch Agent
+#   shell: |
+#     set -euo pipefail
+#     ARCH=amd64
+#     URL="https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/${ARCH}/latest/amazon-cloudwatch-agent.deb"
+#     curl -fsSL "$URL" -o /tmp/amazon-cloudwatch-agent.deb
+#     dpkg -i /tmp/amazon-cloudwatch-agent.deb
+#   args:
+#     executable: /bin/bash
+
