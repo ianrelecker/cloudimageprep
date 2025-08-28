@@ -25,7 +25,7 @@ aws ssm put-parameter \
 
 Option A — SSM Parameter
 ```
-cd terraform/aws
+cd terraform/aws-linux
 terraform init
 terraform apply \
   -var aws_region=us-west-2 \
@@ -34,7 +34,7 @@ terraform apply \
 
 Option B — Direct AMI ID
 ```
-cd terraform/aws
+cd terraform/aws-linux
 terraform init
 terraform apply \
   -var aws_region=us-west-2 \

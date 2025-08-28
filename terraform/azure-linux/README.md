@@ -22,7 +22,7 @@ You can provide the image in two ways:
 ## Usage
 Option A — Managed Image ID
 ```
-cd terraform/azure
+cd terraform/azure-linux
 terraform init
 terraform apply \
   -var location=eastus2 \
@@ -33,7 +33,7 @@ terraform apply \
 
 Option B — Managed Image by Name
 ```
-cd terraform/azure
+cd terraform/azure-linux
 terraform init
 terraform apply \
   -var location=eastus2 \

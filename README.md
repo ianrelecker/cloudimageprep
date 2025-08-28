@@ -5,8 +5,10 @@ Build and launch a hardened-ish Ubuntu 22.04 image on AWS (AMI) or Azure (Manage
 ## Repo Layout
 - `packer/`: Packer HCL templates, variables, versions (AWS and Azure).
 - `ansible/`: Ansible playbook and roles used during the AMI build.
-- `terraform/aws`: Terraform to launch an EC2 instance from the built AMI.
-- `terraform/azure`: Terraform to launch an Azure VM from the built Managed Image.
+- `terraform/aws-linux`: Terraform to launch a Linux EC2 instance from the built AMI.
+- `terraform/aws-windows`: Terraform to launch a Windows Server EC2 instance (from AMI/SSM path).
+- `terraform/azure`: Terraform to launch an Azure Linux VM from the built Managed Image.
+- `terraform/azure-windows`: Terraform to launch an Azure Windows VM from a Managed Image.
 - `.github/workflows/packer-validate.yml`: GitHub Actions workflow to run `packer init` and `packer validate` on PRs.
 
 ## Quickstart
@@ -14,8 +16,7 @@ Build and launch a hardened-ish Ubuntu 22.04 image on AWS (AMI) or Azure (Manage
 ### Prerequisites
 - AWS credentials with permissions to build AMIs and launch EC2.
 - Packer >= 1.9 (install and run `packer init` before build).
-- Ansible available locally (for the `ansible` provisioner):
-  - macOS: `brew install ansible` or `pipx install ansible-core`.
+- Ansible available locally (for the `ansible` provisioner).
 - Terraform >= 1.5 (to launch an instance from the AMI).
 
 ### 1A) Build the AWS AMI with Packer
@@ -130,7 +131,7 @@ Pick one of the two options:
 
 Option A — Use SSM Parameter path (default `/images/ubuntu2204/current`):
 ```
-cd terraform/aws
+cd terraform/aws-linux
 terraform init
 terraform apply \
   -var aws_region=us-west-2 \
@@ -139,7 +140,7 @@ terraform apply \
 
 Option B — Pass the AMI directly (no SSM required):
 ```
-cd terraform/aws
+cd terraform/aws-linux
 terraform init
 terraform apply \
   -var aws_region=us-west-2 \
@@ -148,7 +149,7 @@ terraform apply \
 
 ### 2B) Launch an Azure VM with Terraform (Azure)
 ```
-cd terraform/azure
+cd terraform/azure-linux
 terraform init
 terraform apply \
   -var location=eastus2 \
@@ -186,7 +187,7 @@ Windows AMI specifics:
 ## Configuration and Customization
 - Packer variables: see `packer/variables.pkr.hcl` and override via `PACKER_VAR_*` env vars or `-var` flags.
 - Ansible: edit or add roles under `ansible/roles`, and update `ansible/site.yml` to include them.
-- Terraform variables: see `terraform/aws/variables.tf` and `terraform/azure/variables.tf`.
+- Terraform variables: see `terraform/aws-linux/variables.tf` and `terraform/azure-linux/variables.tf`.
 
 Tip (image generation vs VM size): If you get an error like “cannot boot Hypervisor Generation '1'”, it means the managed image is Gen1 but the selected VM size only supports Gen2. Either rebuild the image as Gen2 (the provided Packer template does this by default), or choose a Gen1-compatible VM size.
 
@@ -198,6 +199,111 @@ Tip (image generation vs VM size): If you get an error like “cannot boot Hyper
 ## Troubleshooting
 - AWS Packer: “No builds to run” — include `-only='aws-ubuntu-2204.*'` or the full build ID.
 - Azure Packer: Make sure `az account show` returns the intended subscription and you have permission to create managed images in the target resource group.
+
+## Azure Windows 11 Enterprise multi-session (24H2)
+
+Build a Windows 11 Enterprise multi-session (Azure Virtual Desktop) managed image using the provided Packer template `packer/azure-windows-11-multisession.pkr.hcl`.
+
+Prereqs:
+- Azure CLI logged in and correct subscription selected: `az login && az account set -s <subscription>`
+- Accept Marketplace image terms (one-time per subscription). Use the proper flags; note that `-o` is the output flag in `az`, not “offer”.
+
+Accept image terms:
+```
+# By fields
+az vm image terms accept \
+  --publisher MicrosoftWindowsDesktop \
+  --offer windows-11 \
+  --sku win11-24h2-avd
+
+# Or via URN
+az vm image terms accept --urn MicrosoftWindowsDesktop:windows-11:win11-24h2-avd:latest
+```
+
+Discover available SKUs in your region (if 24H2 isn’t available):
+```
+az vm image list-skus \
+  -l <region> \
+  -f windows-11 \
+  -p MicrosoftWindowsDesktop \
+  --all -o table
+```
+
+Build the image:
+```
+cd packer
+packer init .
+packer validate .
+packer build -only='azure-windows-11-multisession.*' .
+```
+
+The build prints the managed image resource ID as `MANAGED_IMAGE_ID=...` for easy parsing.
+
+## Customizing Templates
+
+- Packer — Azure Windows (Win11/Win2022):
+  - Edit the `provisioner "windows-update"` and `provisioner "powershell"` inline steps in:
+    - `packer/azure-windows-11-multisession.pkr.hcl`
+    - `packer/azure-windows-server-2022.pkr.hcl`
+  - Change base image via `image_publisher`, `image_offer`, `image_sku`.
+  - The `post-processors` block prints `MANAGED_IMAGE_ID=...` — extend if you need more output.
+
+- Packer — AWS Windows 2022:
+  - Update the two `provisioner "shell-local"` blocks in `packer/aws-windows-2022.pkr.hcl`:
+    - First: waits for SSM and runs `AWS-RunPatchBaseline` (Windows Update).
+    - Second: runs your PowerShell commands through `AWS-RunPowerShellScript`.
+  - For complex PowerShell, prefer a script file under `packer/scripts/` to avoid escaping issues.
+
+- Packer — Ubuntu (AWS/Azure):
+  - Provisioning via Ansible: change `ansible/site.yml` and roles under `ansible/roles/**`.
+  - Templates: `packer/azure-ubuntu-2204.pkr.hcl`, `packer/aws-ubuntu-2204.pkr.hcl`.
+
+- Packer — Shared config:
+  - Variables: `packer/variables.pkr.hcl` and local defaults in `packer/default.auto.pkrvars.hcl`.
+  - Plugin versions: `packer/versions.pkr.hcl`.
+
+- Terraform — Azure Windows:
+  - Module: `terraform/azure-windows/`.
+  - Edit networking (NSG/VNet/subnet/PIP) and VM settings in `main.tf`.
+  - Provide `managed_image_id` or `managed_image_name` + `managed_image_resource_group`.
+
+- Terraform — AWS Windows:
+  - Module: `terraform/aws-windows/`.
+  - Edit instance type, RDP security group, optional `key_name` and `iam_instance_profile` in `main.tf`.
+  - Provide `ami_id` or `ssm_parameter_path`.
+
+- Validate after edits:
+  - Packer: `cd packer && packer init . && packer validate .`
+  - Terraform: `cd terraform/<module> && terraform init -backend=false && terraform validate`
+
+## Azure Windows Server 2022
+
+Build a Windows Server 2022 Datacenter Gen2 managed image, then launch a VM from it.
+
+Accept image terms (one-time per subscription):
+```
+az vm image terms accept --publisher MicrosoftWindowsServer --offer WindowsServer --sku 2022-datacenter-g2
+```
+
+Build the image:
+```
+cd packer
+packer init .
+packer validate .
+packer build -only='azure-windows-server-2022.*' .
+```
+
+Grab the managed image ID from output `MANAGED_IMAGE_ID=...` and launch a Windows VM with Terraform:
+```
+cd terraform/azure-windows
+terraform init
+terraform apply \
+  -var location=eastus2 \
+  -var resource_group_name=cloudprep-winvm \
+  -var managed_image_id="/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Compute/images/<image-name>"
+
+# Terraform outputs the VM public IP, admin username, and a generated admin password (unless you supply one).
+```
 - Ansible not found: install Ansible locally, then re-run `packer init` and `packer validate`.
 
 ## Using ansible-local (optional)
@@ -226,4 +332,4 @@ Note: `ansible-local` runs inside the build VM, slightly increasing build time. 
 - Clean up unused AMIs/snapshots to avoid charges when experimenting.
 
 ## More Docs
-- Terraform usage notes: see `terraform/aws/README.md` and `terraform/azure/README.md`.
+- Terraform usage notes: see `terraform/aws-linux/README.md` and `terraform/azure-linux/README.md`.

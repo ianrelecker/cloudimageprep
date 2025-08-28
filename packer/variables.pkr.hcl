@@ -117,3 +117,5 @@ variable "ssm_publish_path" {
   description = "If set, publish the resulting AMI ID to this SSM Parameter Store path (type=String). Example: /images/windows2022/current"
   default     = ""
 }
+
+// (removed) Azure Key Vault post-publish variables
