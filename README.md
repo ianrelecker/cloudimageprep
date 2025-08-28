@@ -32,6 +32,57 @@ PACKER_VAR_ssh_github_user=<your-github-username> \
 - Variables have sensible defaults in `packer/default.auto.pkrvars.hcl` (region, instance type, disk, encryption, tags).
 - During provisioning, the `ansible/site.yml` playbook runs the `base` and `aws` roles.
 
+Windows (Server 2022) build:
+```
+cd packer
+packer init .
+packer validate .
+
+# Ensure the builder has an SSM-enabled IAM Instance Profile, then run:
+packer build -var 'ssm_iam_instance_profile=PackerSSMProfile' -only='aws-windows-2022.*' .
+```
+- Uses the latest “Windows Server 2022 English Full Base” image as a parent.
+ - By default, provisioning runs via AWS Systems Manager (SSM) instead of WinRM. The builder instance must have an IAM instance profile with the `AmazonSSMManagedInstanceCore` policy. See “Create SSM IAM Instance Profile” below.
+- Windows Updates are applied using the SSM document `AWS-RunPatchBaseline` (Operation=Install, RebootIfNeeded); after updates, a small SSM PowerShell step enables the RDP firewall group and ensures the SSM Agent starts automatically.
+- Consider publishing the resulting Windows AMI ID to a separate SSM path, e.g., `/images/windows2022/current`.
+ - Automatic publish: set `PACKER_VAR_ssm_publish_path=/images/windows2022/current` to have the build publish the resulting AMI ID to SSM automatically.
+
+Create SSM IAM Instance Profile (one-time):
+```
+# 1) Create role with EC2 trust policy
+aws iam create-role --role-name PackerSSMRole \
+  --assume-role-policy-document '{
+    "Version":"2012-10-17",
+    "Statement":[
+      {
+        "Effect":"Allow",
+        "Principal":{"Service":"ec2.amazonaws.com"},
+        "Action":"sts:AssumeRole"
+      }
+    ]
+  }'
+
+# 2) Attach managed SSM policy (AmazonSSMManagedInstanceCore)
+aws iam attach-role-policy --role-name PackerSSMRole \
+  --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+# 3) Create instance profile and add the role to it
+aws iam create-instance-profile --instance-profile-name PackerSSMProfile
+aws iam add-role-to-instance-profile --instance-profile-name PackerSSMProfile --role-name PackerSSMRole
+
+# 4) (Optional) Verify
+aws iam get-role --role-name PackerSSMRole
+aws iam list-attached-role-policies --role-name PackerSSMRole
+aws iam get-instance-profile --instance-profile-name PackerSSMProfile
+
+# 5) Build Windows image using the instance profile
+cd packer
+packer build -var 'ssm_iam_instance_profile=PackerSSMProfile' -only='aws-windows-2022.*' .
+
+# 6) (Optional) Persist in packer/default.auto.pkrvars.hcl instead of -var flag
+# ssm_iam_instance_profile = "PackerSSMProfile"
+```
+
 Optional: Publish the resulting AMI ID to SSM Parameter Store so Terraform can discover it by path:
 ```
 aws ssm put-parameter \
@@ -108,12 +159,29 @@ terraform apply \
 
 Outputs include the instance ID, public IP, and the AMI ID used. The stack deploys into the default VPC and opens SSH (22/TCP) from `ssh_ingress_cidr` (defaults to `0.0.0.0/0` — change this for real use).
 
+For Windows instances, you will typically want to open RDP (3389/TCP) instead of SSH and use the `Administrator` account to log in. The provided Terraform module focuses on Linux; adapt the security group rule and AMI/SSM path when launching Windows.
+
+Windows variant of Terraform (AWS):
+```
+cd terraform/aws-windows
+terraform init
+terraform apply \
+  -var aws_region=us-west-2 \
+  -var ssm_parameter_path=/images/windows2022/current
+```
+This opens RDP (3389/TCP) and launches from the Windows AMI ID found at the provided SSM path. Optionally set `-var key_name=<ec2-keypair>` if you plan to retrieve the Windows password via the AWS console/CLI.
+
 ## What Gets Baked Into the Image
 Provisioning is handled by Ansible roles in `ansible/roles`:
 - `base` role: apt update/upgrade, common tools (`curl`, `jq`, `git`, etc.), adds GitHub public keys for the target SSH user (`target_ssh_user`, set by Packer), and tightens SSH (no root login, no password auth).
 - `aws` role: installs and enables the Amazon SSM Agent via snap. This runs only when `cloud_provider=aws` (automatically set by the Packer templates). It is skipped for Azure builds.
 
 These defaults aim for secure-by-default access via SSM + SSH keys.
+
+Windows AMI specifics:
+- Packer variables: same as Linux for region, instance type, disk, encryption, and tags. Provisioning is orchestrated via SSM using local AWS CLI.
+- Parent image: Windows Server 2022 English Full Base (most recent) filtered by name; the owner account ID is specified in the template and may vary by region — adjust if `packer build` fails to find an AMI.
+- Windows Updates: executed during build with the SSM document `AWS-InstallWindowsUpdates`.
 
 ## Configuration and Customization
 - Packer variables: see `packer/variables.pkr.hcl` and override via `PACKER_VAR_*` env vars or `-var` flags.

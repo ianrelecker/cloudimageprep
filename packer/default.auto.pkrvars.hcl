@@ -14,3 +14,7 @@ azure_location              = "eastus2"
 azure_image_resource_group  = "cloudprep-images"
 azure_vm_size               = "Standard_B2s"
 azure_image_name_prefix     = "cloudprep"
+
+# Windows-specific (optional; can also pass via -var at build time)
+# ssm_iam_instance_profile = "PackerSSMProfile"
+# ssm_publish_path         = "/images/windows2022/current"

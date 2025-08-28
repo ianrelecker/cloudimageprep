@@ -98,3 +98,22 @@ variable "azure_image_name_prefix" {
   description = "Prefix for Azure managed image names"
   default     = "cloudprep"
 }
+
+// Windows-specific variables
+variable "winrm_password" {
+  type        = string
+  description = "Temporary Administrator password used for WinRM during the Windows image build"
+  default     = "PackerWinRM-ChangeMe-123!"
+}
+
+variable "ssm_iam_instance_profile" {
+  type        = string
+  description = "IAM Instance Profile name/ARN attached to the builder, must allow SSM (e.g., AmazonSSMManagedInstanceCore). Required for SSM-based provisioning."
+  default     = ""
+}
+
+variable "ssm_publish_path" {
+  type        = string
+  description = "If set, publish the resulting AMI ID to this SSM Parameter Store path (type=String). Example: /images/windows2022/current"
+  default     = ""
+}
